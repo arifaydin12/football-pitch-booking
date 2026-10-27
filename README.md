@@ -2,7 +2,7 @@
 
 Reservations, canteen sales and revenue reports for a small football pitch, built with **Flutter** (Material 3, light and dark) on **Firebase Auth + Cloud Firestore**.
 
-**[Live demo](https://vaas125.github.io/football-pitch-booking/)** - runs entirely in the browser with sample data, no sign-up needed (use the demo accounts shown on the login screen; the password is `demo1234`).
+**[Live demo](https://arifaydin12.github.io/football-pitch-booking/)** - runs entirely in the browser with sample data, no sign-up needed (use the demo accounts shown on the login screen; the password is `demo1234`).
 
 ![Pitch Manager - reservations](screenshots/screenshot.png)
 
