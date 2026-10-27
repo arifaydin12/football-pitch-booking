@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// Security rules for Pitch Manager.
+//
+// Roles live in users/{uid}.role ('admin' | 'staff'). An account without a
+// profile document has no access at all, which is how "removing" a user works.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // Any signed-in user that has a profile (staff or admin).
+    function isStaff() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isStaff() && profile().data.role == 'admin';
+    }
+
+    // True when a write only touches the listed fields.
+    function onlyChanges(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // User profiles: everyone on staff can read them (the app shows the
+    // signed-in user's role); only admins create, change or delete them.
+    match /users/{userId} {
+      allow read: if isStaff() || (isSignedIn() && request.auth.uid == userId);
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Pitch settings (hourly rate): staff read, admins write.
+    match /settings/{document} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // Canteen products: staff may only change the stock level (a sale);
+    // admins manage the catalogue and prices.
+    match /products/{productId} {
+      allow read: if isStaff();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isStaff() && onlyChanges(['stock']));
+    }
+
+    // Reservations: staff create them and cancel/restore them (status only).
+    // Deleting is reserved for admins; cancelled bookings are normally kept.
+    match /reservations/{reservationId} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update: if isAdmin() || (isStaff() && onlyChanges(['status', 'cancelledAt']));
+      allow delete: if isAdmin();
+    }
+
+    // One lock document per booked hour; prevents double bookings.
+    match /slotLocks/{lockId} {
+      allow read, write: if isStaff();
+    }
+
+    // Sales: staff record them and may void one (flag only). History is never
+    // deleted.
+    match /sales/{saleId} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update: if isStaff() && onlyChanges(['voided']);
+      allow delete: if false;
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
